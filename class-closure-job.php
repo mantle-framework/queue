@@ -2,42 +2,40 @@
 /**
  * Closure_Job class file
  *
+ * phpcs:disable Squiz.Commenting.VariableComment.Missing
+ *
  * @package Mantle
  */
 
 namespace Mantle\Queue;
 
 use Closure;
+use DateTimeInterface;
 use Laravel\SerializableClosure\SerializableClosure;
 use Mantle\Contracts\Queue\Can_Queue;
 use ReflectionFunction;
 use Throwable;
 
 /**
- * Abstract Queue Job
+ * Closure Job
  *
- * To be extended by provider-specific queue job classes.
+ * Storage of the closure-based queue job.
  */
 class Closure_Job implements Can_Queue {
 	/**
-	 * Serializable closure instance.
-	 *
-	 * @var SerializableClosure
+	 * The delay before the job will be run.
 	 */
-	public SerializableClosure $closure;
+	public int|DateTimeInterface $delay;
 
 	/**
 	 * The callbacks that should be run on failure.
-	 *
-	 * @var array
 	 */
-	public $failure_callbacks = [];
+	public array $failure_callbacks = [];
 
 	/**
 	 * Create a new job instance.
 	 *
 	 * @param Closure $closure Closure to wrap.
-	 * @return self
 	 */
 	public static function create( Closure $closure ): Closure_Job {
 		return new self( new SerializableClosure( $closure ) );
@@ -48,17 +46,28 @@ class Closure_Job implements Can_Queue {
 	 *
 	 * @param SerializableClosure $closure Serialized closure to wrap.
 	 */
-	public function __construct( SerializableClosure $closure ) {
-		$this->closure = $closure;
+	public function __construct( public SerializableClosure $closure ) {
 	}
 
 	/**
 	 * Handle the queue job.
 	 */
-	public function handle() {
+	public function handle(): void {
 		$callback = $this->closure->getClosure();
 
 		$callback();
+	}
+
+	/**
+	 * Set the delay before the job will be run.
+	 *
+	 * @param DateTimeInterface|int $delay Delay in seconds or DateTime instance.
+	 * @return static
+	 */
+	public function delay( DateTimeInterface|int $delay ) {
+		$this->delay = $delay;
+
+		return $this;
 	}
 
 	/**
@@ -80,9 +89,9 @@ class Closure_Job implements Can_Queue {
 	 *
 	 * @param \Throwable $e Exception.
 	 */
-	public function failed( Throwable $e ) {
-		foreach ( $this->failure_callbacks as $callback ) {
-			$callback( $e );
+	public function failed( Throwable $e ): void {
+		foreach ( $this->failure_callbacks as $failure_callback ) {
+			$failure_callback( $e );
 		}
 	}
 
