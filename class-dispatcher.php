@@ -7,10 +7,10 @@
 
 namespace Mantle\Queue;
 
-use Mantle\Contracts\Application;
+use Closure;
+use Mantle\Contracts\Container;
 use Mantle\Contracts\Queue\Can_Queue;
 use Mantle\Contracts\Queue\Queue_Manager;
-use Mantle\Queue\Events\Job_Queued;
 
 /**
  * Queue Dispatcher
@@ -19,62 +19,53 @@ use Mantle\Queue\Events\Job_Queued;
  */
 class Dispatcher {
 	/**
+	 * Container instance.
+	 *
+	 * @var Container
+	 */
+	protected $container;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param Application $container Container instance.
+	 * @param Container $container Container instance.
 	 */
-	public function __construct( protected Application $container ) {}
+	public function __construct( Container $container ) {
+		$this->container = $container;
+	}
 
 	/**
 	 * Dispatch the job to the queue.
 	 *
 	 * @param mixed $job Job instance.
+	 * @return mixed
 	 */
-	public function dispatch( mixed $job ): void {
+	public function dispatch( $job ) {
 		if ( ! $this->should_command_be_queued( $job ) ) {
-			$this->dispatch_now( $job );
-
-			return;
+			return $this->dispatch_now( $job );
 		}
 
-		/**
-		 * Provider instance.
-		 *
-		 * @var \Mantle\Contracts\Queue\Provider
-		 */
-		$provider = $this->container->make( Queue_Manager::class )->get_provider();
+		$manager = $this->container->make( Queue_Manager::class );
 
 		// Send the job to the queue.
-		$provider->push( $job );
-
-		// Dispatch the job queued event.
-		$this->container['events']->dispatch(
-			new Job_Queued( $provider, $job ),
-		);
-	}
-
-	/**
-	 * Dispatch the job after sending the given response.
-	 *
-	 * @param mixed $job Job instance.
-	 */
-	public function dispatch_after_response( mixed $job ): void {
-		$this->container->terminating( fn () => $this->dispatch_now( $job ) );
+		$manager->get_provider()->push( $job );
 	}
 
 	/**
 	 * Dispatch a job in the current process.
 	 *
 	 * @param mixed $job Job instance.
+	 * @return mixed
 	 */
-	public function dispatch_now( mixed $job ): void {
-		$this->container->call( [ $job, 'handle' ] );
+	public function dispatch_now( $job ) {
+		return $this->container->call( [ $job, 'handle' ] );
 	}
 
 	/**
 	 * Check if the command should be queued.
 	 *
 	 * @param mixed $job Job instance.
+	 * @return bool
 	 */
 	protected function should_command_be_queued( $job ): bool {
 		return $job instanceof Can_Queue;

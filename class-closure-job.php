@@ -2,51 +2,44 @@
 /**
  * Closure_Job class file
  *
- * phpcs:disable Squiz.Commenting.VariableComment.Missing
- *
  * @package Mantle
  */
 
 namespace Mantle\Queue;
 
 use Closure;
-use DateTimeInterface;
 use Laravel\SerializableClosure\SerializableClosure;
 use Mantle\Contracts\Queue\Can_Queue;
 use ReflectionFunction;
 use Throwable;
 
 /**
- * Closure Job
+ * Abstract Queue Job
  *
- * Storage of the closure-based queue job.
+ * To be extended by provider-specific queue job classes.
  */
 class Closure_Job implements Can_Queue {
 	/**
-	 * The delay before the job will be run.
+	 * Serializable closure instance.
+	 *
+	 * @var SerializableClosure
 	 */
-	public int|DateTimeInterface $delay;
+	public SerializableClosure $closure;
 
 	/**
 	 * The callbacks that should be run on failure.
+	 *
+	 * @var array
 	 */
-	public array $failure_callbacks = [];
+	public $failure_callbacks = [];
 
 	/**
 	 * Create a new job instance.
 	 *
 	 * @param Closure $closure Closure to wrap.
+	 * @return self
 	 */
 	public static function create( Closure $closure ): Closure_Job {
-		$reflection_closure = new \ReflectionFunction( $closure );
-
-		// Check if the closure is bound to WP_CLI\Runner. If so, unbind it because
-		// this will cause a serialization error. Without this, we cannot dispatch
-		// to the queue from WP-CLI.
-		if ( \WP_CLI\Runner::class === $reflection_closure->getClosureScopeClass()?->getName() ) {
-			$closure = $closure->bindTo( null, null );
-		}
-
 		return new self( new SerializableClosure( $closure ) );
 	}
 
@@ -55,28 +48,17 @@ class Closure_Job implements Can_Queue {
 	 *
 	 * @param SerializableClosure $closure Serialized closure to wrap.
 	 */
-	public function __construct( public SerializableClosure $closure ) {
+	public function __construct( SerializableClosure $closure ) {
+		$this->closure = $closure;
 	}
 
 	/**
 	 * Handle the queue job.
 	 */
-	public function handle(): void {
+	public function handle() {
 		$callback = $this->closure->getClosure();
 
 		$callback();
-	}
-
-	/**
-	 * Set the delay before the job will be run.
-	 *
-	 * @param DateTimeInterface|int $delay Delay in seconds or DateTime instance.
-	 * @return static
-	 */
-	public function delay( DateTimeInterface|int $delay ) {
-		$this->delay = $delay;
-
-		return $this;
 	}
 
 	/**
@@ -98,9 +80,9 @@ class Closure_Job implements Can_Queue {
 	 *
 	 * @param \Throwable $e Exception.
 	 */
-	public function failed( Throwable $e ): void {
-		foreach ( $this->failure_callbacks as $failure_callback ) {
-			$failure_callback( $e );
+	public function failed( Throwable $e ) {
+		foreach ( $this->failure_callbacks as $callback ) {
+			$callback( $e );
 		}
 	}
 
@@ -110,13 +92,7 @@ class Closure_Job implements Can_Queue {
 	 * @return mixed
 	 */
 	public function get_id() {
-		$closure = $this->closure->getClosure();
-
-		if ( ! $closure ) { // @phpstan-ignore-line negated
-			return 'Invalid Closure Job';
-		}
-
-		$reflection = new ReflectionFunction( $closure );
+		$reflection = new ReflectionFunction( $this->closure->getClosure() );
 
 		return 'Closure (' . basename( $reflection->getFileName() ) . ':' . $reflection->getStartLine() . ')';
 	}
