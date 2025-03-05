@@ -7,6 +7,7 @@
 
 namespace Mantle\Queue;
 
+use DateTimeInterface;
 use Mantle\Container\Container;
 use Mantle\Contracts\Queue\Dispatcher;
 use Mantle\Contracts\Queue\Job;
@@ -17,20 +18,16 @@ use RuntimeException;
  */
 class Pending_Dispatch {
 	/**
-	 * Job instance.
-	 *
-	 * @var Closure_Job|Job
+	 * Flag to run the job after the response is sent.
 	 */
-	protected Closure_Job|Job $job; // phpcs:ignore Squiz.Commenting.VariableComment.Missing
+	protected bool $after_response = false;
 
 	/**
 	 * Constructor.
 	 *
 	 * @param Job|Closure_Job $job Job instance.
 	 */
-	public function __construct( $job ) {
-		$this->job = $job;
-	}
+	public function __construct( protected Job|Closure_Job $job ) {}
 
 	/**
 	 * Add a dispatch to a specific queue.
@@ -38,7 +35,6 @@ class Pending_Dispatch {
 	 * @throws RuntimeException If the job does not support queueing.
 	 *
 	 * @param string $queue Queue to add to.
-	 * @return static
 	 */
 	public function on_queue( string $queue ): Pending_Dispatch {
 		if ( ! method_exists( $this->job, 'on_queue' ) ) {
@@ -55,12 +51,11 @@ class Pending_Dispatch {
 	 *
 	 * @throws RuntimeException If the job does not support queueing.
 	 *
-	 * @param int $delay Delay in seconds.
-	 * @return static
+	 * @param DateTimeInterface|int $delay Delay in seconds or DateTime instance.
 	 */
-	public function delay( int $delay ): Pending_Dispatch {
+	public function delay( DateTimeInterface|int $delay ): Pending_Dispatch {
 		if ( ! method_exists( $this->job, 'delay' ) ) {
-			throw new RuntimeException( 'Job does not support queueing.' );
+			throw new RuntimeException( $this->job::class . ' does not support delayed queueing.' );
 		}
 
 		$this->job->delay( $delay );
@@ -69,7 +64,18 @@ class Pending_Dispatch {
 	}
 
 	/**
-	 * Handle the job and send it to the queue.
+	 * Flag the job to be run after the response is sent.
+	 *
+	 * @param bool $after_response Flag to run the job after the response is sent.
+	 */
+	public function after_response( bool $after_response = true ): Pending_Dispatch {
+		$this->after_response = $after_response;
+
+		return $this;
+	}
+
+	/**
+	 * Handle the job and send it to the queue or run it immediately.
 	 */
 	public function __destruct() {
 		if ( ! isset( $this->job ) ) {
@@ -78,9 +84,15 @@ class Pending_Dispatch {
 
 		// Allow the queue package to be run independent of the application.
 		if ( ! class_exists( \Mantle\Application\Application::class ) ) {
-			Container::get_instance()->make( Dispatcher::class )->dispatch( $this->job );
+			$dispatcher = Container::get_instance()->make( Dispatcher::class );
 		} else {
-			app( Dispatcher::class )->dispatch( $this->job );
+			$dispatcher = app( Dispatcher::class );
+		}
+
+		if ( $this->after_response ) {
+			$dispatcher->dispatch_after_response( $this->job );
+		} else {
+			$dispatcher->dispatch( $this->job );
 		}
 	}
 }

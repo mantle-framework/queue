@@ -2,10 +2,14 @@
 /**
  * Queueable trait file.
  *
+ * phpcs:disable Squiz.Commenting.VariableComment.Missing
+ *
  * @package Mantle
  */
 
 namespace Mantle\Queue;
+
+use DateTimeInterface;
 
 /**
  * Queueable trait for queue jobs.
@@ -15,17 +19,13 @@ namespace Mantle\Queue;
 trait Queueable {
 	/**
 	 * The delay before the job will be run.
-	 *
-	 * @var int
 	 */
-	public $delay;
+	public int|DateTimeInterface $delay;
 
 	/**
 	 * The name of the queue for the job.
-	 *
-	 * @var string
 	 */
-	public $queue;
+	public string $queue;
 
 	/**
 	 * Add a dispatch to a specific queue.
@@ -35,17 +35,19 @@ trait Queueable {
 	 */
 	public function on_queue( string $queue ) {
 		$this->queue = $queue;
+
 		return $this;
 	}
 
 	/**
 	 * Set the delay before the job will be run.
 	 *
-	 * @param int $delay Delay in seconds.
+	 * @param DateTimeInterface|int $delay Delay in seconds or DateTime instance.
 	 * @return static
 	 */
-	public function delay( int $delay ) {
+	public function delay( DateTimeInterface|int $delay ) {
 		$this->delay = $delay;
+
 		return $this;
 	}
 }

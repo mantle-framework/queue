@@ -16,9 +16,9 @@ trait Dispatchable {
 	/**
 	 * Dispatch the job with the given arguments.
 	 *
-	 * @param mixed ...$args Dispatch arguments.
+	 * @param mixed ...$args Arguments passed to the job.
 	 */
-	public static function dispatch( ...$args ) {
+	public static function dispatch( ...$args ): Pending_Dispatch {
 		return new Pending_Dispatch( new static( ...$args ) );
 	}
 
@@ -27,8 +27,9 @@ trait Dispatchable {
 	 *
 	 * @param bool  $boolean Truth check.
 	 * @param mixed ...$args Dispatch arguments.
+	 * @return Pending_Dispatch|false
 	 */
-	public static function dispatch_if( $boolean, ...$args ) {
+	public static function dispatch_if( $boolean, ...$args ): Pending_Dispatch|bool {
 		return $boolean ? static::dispatch( ...$args ) : false;
 	}
 
@@ -37,8 +38,9 @@ trait Dispatchable {
 	 *
 	 * @param bool  $boolean Truth check.
 	 * @param mixed ...$args Dispatch arguments.
+	 * @return Pending_Dispatch|false
 	 */
-	public static function dispatch_unless( $boolean, ...$args ) {
+	public static function dispatch_unless( $boolean, ...$args ): Pending_Dispatch|bool {
 		return ! $boolean ? static::dispatch( ...$args ) : false;
 	}
 
@@ -47,8 +49,19 @@ trait Dispatchable {
 	 *
 	 * @param mixed ...$args Dispatch arguments.
 	 */
-	public static function dispatch_now( ...$args ) {
-		return app( Dispatcher::class )->dispatch_now(
+	public static function dispatch_now( ...$args ): void {
+		app( Dispatcher::class )->dispatch_now(
+			new static( ...$args )
+		);
+	}
+
+	/**
+	 * Dispatch after sending the response.
+	 *
+	 * @param mixed ...$args Dispatch arguments.
+	 */
+	public static function dispatch_after_response( ...$args ): void {
+		app( Dispatcher::class )->dispatch_after_response(
 			new static( ...$args )
 		);
 	}
