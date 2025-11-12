@@ -168,7 +168,7 @@ class Queue_Jobs_Table extends WP_List_Table {
 
 		$this->set_pagination_args(
 			[
-				'total_items' => $query->get_found_rows() ?: 0,
+				'total_items' => $query->get_found_rows(),
 				'per_page'    => $this->per_page,
 			]
 		);
